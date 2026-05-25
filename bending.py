@@ -22,9 +22,9 @@ import mediapipe as mp
 import math
 import time
 
-
+###################
 # Utility Functions
-
+###################
 
 def distance(p1, p2):
     return math.sqrt(
@@ -32,6 +32,20 @@ def distance(p1, p2):
         (p1.y - p2.y) ** 2
     )
 
+def is_hand_fist(hand):
+    fingers_curled = 0
+    for finger in [
+        mp_hands.HandLandmark.INDEX_FINGER_TIP,
+        mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
+        mp_hands.HandLandmark.RING_FINGER_TIP,
+        mp_hands.HandLandmark.PINKY_TIP
+    ]:
+        tip = hand.landmark[finger]
+        pip = hand.landmark[finger - 2]
+        if tip.y > pip.y:  # tip BELOW pip = finger curled DOWN = fist
+            fingers_curled += 1
+
+    return fingers_curled >= 3
 
 def is_index_up(hand):
     """
@@ -64,106 +78,173 @@ def is_thumb_up(hand):
 
     return thumb_tip.y < thumb_ip.y
 
+def are_fingers_together(hand, threshold=0.05):
+    """
+    Returns True if the fingers are together (not splayed).
+    """
+
+    index_tip = hand.landmark[
+        mp_hands.HandLandmark.INDEX_FINGER_TIP
+    ]
+
+    middle_tip = hand.landmark[
+        mp_hands.HandLandmark.MIDDLE_FINGER_TIP
+    ]
+
+    ring_tip = hand.landmark[
+        mp_hands.HandLandmark.RING_FINGER_TIP
+    ]
+
+    pinky_tip = hand.landmark[
+        mp_hands.HandLandmark.PINKY_TIP
+    ]
+
+    return (
+        distance(index_tip, middle_tip) < threshold and
+        distance(middle_tip, ring_tip) < threshold and
+        distance(ring_tip, pinky_tip) < threshold
+    )
+
 
 def are_hands_close(hand1, hand2, threshold=0.15):
     """
     Returns True if the two index fingertips are close together.
     """
-
     index1 = hand1.landmark[
         mp_hands.HandLandmark.INDEX_FINGER_TIP
     ]
-
     index2 = hand2.landmark[
         mp_hands.HandLandmark.INDEX_FINGER_TIP
     ]
-
     return distance(index1, index2) < threshold
 
 def overlay_transparent(background, overlay, x, y):
 
+    bg_h, bg_w = background.shape[:2]
     h, w = overlay.shape[:2]
 
-    # prevent drawing outside frame
-    if x < 0 or y < 0:
+    # completely outside frame
+    if x >= bg_w or y >= bg_h:
         return
 
-    if x + w > background.shape[1]:
+    if x + w <= 0 or y + h <= 0:
         return
 
-    if y + h > background.shape[0]:
-        return
+    # clip coordinates
+    x1 = max(x, 0)
+    y1 = max(y, 0)
 
-    # split alpha channel
-    overlay_rgb = overlay[:, :, :3]
-    alpha = overlay[:, :, 3] / 255.0
+    x2 = min(x + w, bg_w)
+    y2 = min(y + h, bg_h)
 
-    # region of interest
-    roi = background[y:y+h, x:x+w]
+    # corresponding overlay coordinates
+    overlay_x1 = x1 - x
+    overlay_y1 = y1 - y
+
+    overlay_x2 = overlay_x1 + (x2 - x1)
+    overlay_y2 = overlay_y1 + (y2 - y1)
+
+    # cropped regions
+    background_region = background[y1:y2, x1:x2]
+
+    overlay_region = overlay[
+        overlay_y1:overlay_y2,
+        overlay_x1:overlay_x2
+    ]
+
+    # split channels
+    overlay_rgb = overlay_region[:, :, :3]
+
+    alpha = overlay_region[:, :, 3:] / 255.0
 
     # blend
     blended = (
-        roi * (1 - alpha[:, :, None]) +
-        overlay_rgb * alpha[:, :, None]
+        background_region * (1 - alpha) +
+        overlay_rgb * alpha
     ).astype("uint8")
 
-    background[y:y+h, x:x+w] = blended
+    background[y1:y2, x1:x2] = blended
 
+
+#####################
+# Mudras
+######################
+
+def detect_mushti(hand):
+    """
+    Mushti Mudra:
+    - all fingers curled in (fist)
+    - thumb knuckle visible
+    """
+
+    if not is_hand_fist(hand):
+        return False
+
+    return True
+
+def gyana_mudra(hand):
+    """
+    Gyana Mudra:
+    - index finger and thumb tips touching
+    - other fingers extended
+    """
+
+    index_tip = hand.landmark[
+        mp_hands.HandLandmark.INDEX_FINGER_TIP
+    ]
+
+    thumb_tip = hand.landmark[
+        mp_hands.HandLandmark.THUMB_TIP
+    ]
+
+    if distance(index_tip, thumb_tip) > 0.1:
+        return False
+
+    # Check if other fingers are extended
+    for finger in [
+        mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
+        mp_hands.HandLandmark.RING_FINGER_TIP,
+        mp_hands.HandLandmark.PINKY_TIP
+    ]:
+        tip = hand.landmark[finger]
+        pip = hand.landmark[finger - 2]  # PIP joint is 2 landmarks before the tip
+        if tip.y > pip.y:  # If the tip is below the PIP joint, it's not extended
+            return False
+
+    return True
+
+
+##########################
 # Pose Detection Functions
-
+##########################
 
 # Earth Pose Detection
 def detect_earth_pose(hand1, hand2):
     """
     Earth Pose:
-    - both hands present
-    - both index fingers up
-    - hands close together
+    - both hands in mushti mudra (fist with thumb knuckle visible)
+    - hands close together (threshold can be adjusted based on testing)
     """
-
-    if not is_index_up(hand1):
-        return False
-
-    if not is_index_up(hand2):
-        return False
-
-    if not are_hands_close(hand1, hand2):
-        return False
-
-    return True
-
-
+    return (
+        detect_mushti(hand1) and
+        detect_mushti(hand2) and
+        are_hands_close(hand1, hand2, threshold=0.15)
+    )
 
 # Water Pose Detection
-
-
 def detect_water_pose(hand1, hand2):
     """
     Water Pose:
-    - one hand thumb up
-    - one hand index up
-    - hands separated slightly
+    - both hands in gyana mudra (index finger and thumb tips touching)
+    - hands close together (threshold can be adjusted based on testing)
     """
+    return (
+        gyana_mudra(hand1) and
+        gyana_mudra(hand2) and
+        are_hands_close(hand1, hand2, threshold=0.15)
+        )
 
-    hand1_thumb = is_thumb_up(hand1)
-    hand2_thumb = is_thumb_up(hand2)
 
-    hand1_index = is_index_up(hand1)
-    hand2_index = is_index_up(hand2)
-
-    # one hand acts vertical
-    # one hand acts horizontal
-
-    condition1 = hand1_thumb and hand2_index
-    condition2 = hand2_thumb and hand1_index
-
-    if not (condition1 or condition2):
-        return False
-
-    if are_hands_close(hand1, hand2, threshold=0.08):
-        return False
-
-    return True
 
 # Animation Overlay Functions
 
@@ -241,15 +322,20 @@ def render_earth(frame, hands):
 def render_air(frame, hands):
     render_effect(frame, hands, air_effect)
 
+
+##########################
 # State Variables
+##########################
 current_element = None
 effect_start_time = 0
 effect_duration = 5
 
 
 
-
+##########################
 # Main Loop
+##########################
+
 
 mp_hands = mp.solutions.hands
 mp_draw = mp.solutions.drawing_utils
