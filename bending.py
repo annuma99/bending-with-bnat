@@ -62,6 +62,12 @@ def is_index_up(hand):
 
     return index_tip.y < index_pip.y
 
+def are_hands_crossed(hand1, hand2):
+    wrist1 = hand1.landmark[mp_hands.HandLandmark.WRIST]
+    wrist2 = hand2.landmark[mp_hands.HandLandmark.WRIST]
+
+    # wrists must be near each other horizontally
+    return abs(wrist1.x - wrist2.x) < 0.2
 
 def is_thumb_up(hand):
     """
@@ -213,6 +219,51 @@ def gyana_mudra(hand):
 
     return True
 
+def alapadma_mudra(hand):
+    # fingers spread APART (NOT together)
+    if are_fingers_together(hand, threshold=0.1):
+        return False
+
+    # all fingers extended upward
+    for finger in [
+        mp_hands.HandLandmark.INDEX_FINGER_TIP,
+        mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
+        mp_hands.HandLandmark.RING_FINGER_TIP,
+        mp_hands.HandLandmark.PINKY_TIP
+    ]:
+        tip = hand.landmark[finger]
+        pip = hand.landmark[finger - 2]
+        if tip.y > pip.y:
+            return False
+
+    return True
+
+def bhramara_mudra(hand):
+    # index finger curled in, all other fingersout
+    # thumb and middle finger tips touching, other fingers extended
+    index_tip = hand.landmark[
+        mp_hands.HandLandmark.INDEX_FINGER_TIP
+    ]
+    thumb_tip = hand.landmark[
+        mp_hands.HandLandmark.THUMB_TIP
+    ]
+    middle_tip = hand.landmark[
+        mp_hands.HandLandmark.MIDDLE_FINGER_TIP
+    ]
+    if distance(thumb_tip, middle_tip) > 0.1:
+        return False
+    if index_tip.y < hand.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].y:
+        return False
+    for finger in [
+        mp_hands.HandLandmark.RING_FINGER_TIP,
+        mp_hands.HandLandmark.PINKY_TIP
+    ]:
+        tip = hand.landmark[finger]
+        pip = hand.landmark[finger - 2]
+        if tip.y > pip.y:
+            return False
+    return True
+
 
 ##########################
 # Pose Detection Functions
@@ -228,7 +279,7 @@ def detect_earth_pose(hand1, hand2):
     return (
         detect_mushti(hand1) and
         detect_mushti(hand2) and
-        are_hands_close(hand1, hand2, threshold=0.15)
+        are_hands_close(hand1, hand2, threshold=0.08)
     )
 
 # Water Pose Detection
@@ -241,9 +292,35 @@ def detect_water_pose(hand1, hand2):
     return (
         gyana_mudra(hand1) and
         gyana_mudra(hand2) and
-        are_hands_close(hand1, hand2, threshold=0.15)
+        are_hands_close(hand1, hand2, threshold=0.08)
         )
+def detect_fire_pose(hand1, hand2):
+    """
+    Fire Pose:
+    - both hands in alapadma mudra (all fingers extended and spread apart)
+    - hands crossed over each other (threshold can be adjusted based on testing)
+    - hands will be vertically oriented (index fingers pointing up)
+    """
+  
+    return (
+        alapadma_mudra(hand1) and
+        alapadma_mudra(hand2) and
+        are_hands_crossed(hand1, hand2) and
+        is_index_up(hand1) and
+        is_index_up(hand2)
+    )
 
+def detect_air_pose(hand1, hand2):
+    """
+    Air Pose:
+    - both hands in bhramara mudra (index finger curled in, all other fingers out)
+    - hands crossed over each other (threshold can be adjusted based on testing)
+    """
+    return (
+        bhramara_mudra(hand1) and
+        bhramara_mudra(hand2) and
+        are_hands_crossed(hand1, hand2)
+    )
 
 
 # Animation Overlay Functions
@@ -412,16 +489,16 @@ while True:
                     print("WATER ACTIVATED")
 
 
-            # # Fire Pose
-            # elif detect_fire_pose(hand1, hand2):
+            # Fire Pose
+            elif detect_fire_pose(hand1, hand2):
 
-            #     if current_element is None:
+                if current_element is None:
 
-            #         current_element = "fire"
+                    current_element = "fire"
 
-            #         effect_start_time = time.time()
+                    effect_start_time = time.time()
 
-            #         print("FIRE ACTIVATED")
+                    print("FIRE ACTIVATED")
 
 
             # # Air Pose
