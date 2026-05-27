@@ -240,24 +240,18 @@ def alapadma_mudra(hand):
 
 def bhramara_mudra(hand):
     # index finger curled in, all other fingersout
-    # thumb and middle finger tips touching, other fingers extended
+    # other fingers extended
     index_tip = hand.landmark[
         mp_hands.HandLandmark.INDEX_FINGER_TIP
     ]
-    thumb_tip = hand.landmark[
-        mp_hands.HandLandmark.THUMB_TIP
-    ]
-    middle_tip = hand.landmark[
-        mp_hands.HandLandmark.MIDDLE_FINGER_TIP
-    ]
-    if distance(thumb_tip, middle_tip) > 0.1:
-        return False
     if index_tip.y < hand.landmark[mp_hands.HandLandmark.INDEX_FINGER_PIP].y:
         return False
     for finger in [
         mp_hands.HandLandmark.RING_FINGER_TIP,
-        mp_hands.HandLandmark.PINKY_TIP
-    ]:
+        mp_hands.HandLandmark.PINKY_TIP,
+        mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
+        mp_hands.HandLandmark.THUMB_TIP
+        ]:
         tip = hand.landmark[finger]
         pip = hand.landmark[finger - 2]
         if tip.y > pip.y:
@@ -501,16 +495,16 @@ while True:
                     print("FIRE ACTIVATED")
 
 
-            # # Air Pose
-            # elif detect_air_pose(hand1, hand2):
+            # Air Pose
+            elif detect_air_pose(hand1, hand2):
 
-            #     if current_element is None:
+                if current_element is None:
 
-            #         current_element = "air"
+                    current_element = "air"
 
-            #         effect_start_time = time.time()
+                    effect_start_time = time.time()
 
-            #         print("AIR ACTIVATED")
+                    print("AIR ACTIVATED")
 
     
     # Render Active Effect
