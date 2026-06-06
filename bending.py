@@ -364,7 +364,7 @@ def spawn_particles(x, y, element, speed):
                 "gravity": 0.12,
                 "life":  1.0,
                 "decay": random.uniform(0.008, 0.02),
-                "size":  random.randint(3, 8),
+                "size": random.randint( 6, 16 + int(speed * 0.5) ),
                 "color_hot":  (255, 220, 180),  # light blue-white (BGR)
                 "color_cold": (180, 80,  20),   # deep blue (BGR)
                 "element": "water",
@@ -382,7 +382,7 @@ def spawn_particles(x, y, element, speed):
                 "life":  1.0,
                 "decay": random.uniform(0.01, 0.025),
                 # large chunky squares
-                "size":  random.randint(8, 20),
+                "size": random.randint( 6, 16 + int(speed * 0.5) ),
                 "color_hot":  (30,  120, 80),   # light earthy green (BGR)
                 "color_cold": (10,  50,  100),  # dark brown (BGR)
                 "element": "earth",
@@ -405,7 +405,7 @@ def spawn_particles(x, y, element, speed):
                 "vy":   math.sin(angle) * speed,
                 "life": 1.0,
                 "decay": random.uniform(0.04, 0.08),
-                "size":  random.randint(2, 6),
+                "size": random.randint( 6, 16 + int(speed * 0.5) ),
                 "color_hot":  (255, 255, 255),  # white (BGR)
                 "color_cold": (180, 180, 180),  # light gray (BGR)
                 "element": "air",
@@ -594,7 +594,8 @@ def update_and_draw_particles(frame):
 # Hand landmark positions
 ##########################
  
-def get_hand_points(hand, frame_w, frame_h):
+def get_hand_points(hand, frame_w, frame_h, hand_id):
+
     tips = [
         mp_hands.HandLandmark.INDEX_FINGER_TIP,
         mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
@@ -606,13 +607,37 @@ def get_hand_points(hand, frame_w, frame_h):
 
     points = []
 
-    for t in tips:
-        lm = hand.landmark[t]
+    for landmark_id in tips:
+
+        lm = hand.landmark[landmark_id]
 
         x = int(lm.x * frame_w)
         y = int(lm.y * frame_h)
 
-        points.append((x, y))
+        key = (hand_id, landmark_id)
+
+        if key not in previous_points:
+            previous_points[key] = (x, y)
+
+        prev_x, prev_y = previous_points[key]
+
+        vx = x - prev_x
+        vy = y - prev_y
+
+        speed = math.sqrt(vx * vx + vy * vy)
+
+        previous_points[key] = (x, y)
+
+        points.append((x, y, speed))
+        cv2.putText(
+        frame,
+        str(int(speed)),
+        (x, y),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.5,
+        (0,255,0),
+        1
+        )
 
     return points
  
@@ -723,7 +748,7 @@ while True:
             3,
             cv2.LINE_AA
         )
- 
+    
     cv2.imshow("Bending with Bnat", frame)
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
