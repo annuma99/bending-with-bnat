@@ -325,11 +325,16 @@ def detect_air_pose(hand1, hand2):
  
 particles = []
  
-def spawn_particles(x, y, element):
+def spawn_particles(x, y, element, speed):
     """Spawn a burst of particles at (x, y) for the given element."""
  
     if element == "fire":
-        for _ in range(8):
+        particle_count = min(
+            25,
+            max(4, int(speed / 2))
+        )
+
+        for _ in range(particle_count):
             particles.append({
                 "x":     x + random.randint(-15, 15),
                 "y":     y + random.randint(-5, 5),
@@ -338,7 +343,7 @@ def spawn_particles(x, y, element):
                 "vy":    random.uniform(-6, -2),
                 "life":  1.0,
                 "decay": random.uniform(0.025, 0.05),
-                "size":  random.randint(6, 16),
+                "size": random.randint( 6, 16 + int(speed * 0.5) ),
                 # color shifts from white-yellow at birth to deep red at death
                 # stored as (r_start, g_start, b_start) in BGR
                 "color_hot":  (30,  200, 255),  # bright yellow-white (BGR)
@@ -589,7 +594,7 @@ def update_and_draw_particles(frame):
 # Hand landmark positions
 ##########################
  
-def get_hand_points(hand, frame_w, frame_h, hand_id):
+def get_hand_points(hand, frame_w, frame_h):
     tips = [
         mp_hands.HandLandmark.INDEX_FINGER_TIP,
         mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
@@ -601,26 +606,13 @@ def get_hand_points(hand, frame_w, frame_h, hand_id):
 
     points = []
 
-    for landmark_id in tips:
+    for t in tips:
+        lm = hand.landmark[t]
 
-        lm = hand.landmark[landmark_id]
+        x = int(lm.x * frame_w)
+        y = int(lm.y * frame_h)
 
-        raw_x = int(lm.x * frame_w)
-        raw_y = int(lm.y * frame_h)
-
-        key = (hand_id, landmark_id)
-
-        if key not in smoothed_points:
-            smoothed_points[key] = (raw_x, raw_y)
-
-        old_x, old_y = smoothed_points[key]
-
-        smooth_x = int(old_x * 0.8 + raw_x * 0.2)
-        smooth_y = int(old_y * 0.8 + raw_y * 0.2)
-
-        smoothed_points[key] = (smooth_x, smooth_y)
-
-        points.append((smooth_x, smooth_y))
+        points.append((x, y))
 
     return points
  
@@ -632,7 +624,7 @@ current_element = None
 effect_start_time = 0
 effect_duration = 5
 
-smoothed_points = {}
+previous_points = {}
 
 
 
@@ -704,8 +696,8 @@ while True:
             if results.multi_hand_landmarks:
                 for i, hand in enumerate(results.multi_hand_landmarks):
                     points = get_hand_points(hand, w, h, i)
-                    for (px, py) in points:
-                        spawn_particles(px, py, current_element)
+                    for (px, py, speed) in points:
+                        spawn_particles(px,py,current_element,speed)
         else:
             current_element = None
             print("Effect ended")
