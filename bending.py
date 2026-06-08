@@ -343,7 +343,9 @@ def spawn_particles(x, y, element, speed):
                 "vy":    random.uniform(-6, -2),
                 "life":  1.0,
                 "decay": random.uniform(0.025, 0.05),
-                "size": random.randint( 6, 16 + int(speed * 0.5) ),
+                "size" : random.randint(6, 12),
+                "vx" : random.uniform(-1.5, 1.5) * (1 + speed * 0.02),
+                "vy" : random.uniform(-6, -2)    * (1 + speed * 0.02),
                 # color shifts from white-yellow at birth to deep red at death
                 # stored as (r_start, g_start, b_start) in BGR
                 "color_hot":  (30,  200, 255),  # bright yellow-white (BGR)
@@ -352,26 +354,31 @@ def spawn_particles(x, y, element, speed):
             })
  
     elif element == "water":
-        for _ in range(6):
+        particle_count = max(
+            4,
+            min(20, int(speed / 3))
+        )
+        for _ in range(particle_count):
             angle = random.uniform(0, 2 * math.pi)
-            speed = random.uniform(1, 3)
+            particle_speed = random.uniform(1, 3)
             particles.append({
                 "x":     x + random.randint(-10, 10),
                 "y":     y + random.randint(-10, 10),
                 # water flows outward and then drops under gravity
-                "vx":    math.cos(angle) * speed,
-                "vy":    math.sin(angle) * speed * 0.5 + random.uniform(-1, 0.5),
+                "vx":    math.cos(angle) * particle_speed,
+                "vy":    math.sin(angle) * particle_speed * 0.5 + random.uniform(-1, 0.5),
                 "gravity": 0.12,
                 "life":  1.0,
                 "decay": random.uniform(0.008, 0.02),
-                "size": random.randint( 6, 16 + int(speed * 0.5) ),
+                "size":  random.randint(3, 8),
                 "color_hot":  (255, 220, 180),  # light blue-white (BGR)
                 "color_cold": (180, 80,  20),   # deep blue (BGR)
                 "element": "water",
             })
  
     elif element == "earth":
-        for _ in range(6):
+        particle_count = min(20, max(4, int(speed / 2)))
+        for _ in range(particle_count):
             particles.append({
                 "x":     x + random.randint(-20, 20),
                 "y":     y + random.randint(-5, 5),
@@ -382,7 +389,7 @@ def spawn_particles(x, y, element, speed):
                 "life":  1.0,
                 "decay": random.uniform(0.01, 0.025),
                 # large chunky squares
-                "size": random.randint( 6, 16 + int(speed * 0.5) ),
+                "size":  random.randint(8, 20),
                 "color_hot":  (30,  120, 80),   # light earthy green (BGR)
                 "color_cold": (10,  50,  100),  # dark brown (BGR)
                 "element": "earth",
@@ -394,18 +401,18 @@ def spawn_particles(x, y, element, speed):
             })
  
     elif element == "air":
+        speed_multiplier = 1 + speed * 0.03
         for _ in range(10):
             angle = random.uniform(0, 2 * math.pi)
-            speed = random.uniform(3, 7)
             particles.append({
                 "x":    x,
                 "y":    y,
                 # air blasts outward in all directions fast
-                "vx":   math.cos(angle) * speed,
-                "vy":   math.sin(angle) * speed,
+                "vx":   math.cos(angle) * speed_multiplier,
+                "vy":   math.sin(angle) * speed_multiplier,
                 "life": 1.0,
                 "decay": random.uniform(0.04, 0.08),
-                "size": random.randint( 6, 16 + int(speed * 0.5) ),
+                "size":  random.randint(2, 6),
                 "color_hot":  (255, 255, 255),  # white (BGR)
                 "color_cold": (180, 180, 180),  # light gray (BGR)
                 "element": "air",
